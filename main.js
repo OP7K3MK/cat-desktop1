@@ -1,5 +1,9 @@
 const { app, BrowserWindow, ipcMain, screen, Menu, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const logFile = () => path.join(app.getPath('userData'), 'log.txt');
+const log = (...a) => { try { fs.appendFileSync(logFile(), new Date().toISOString() + ' ' + a.join(' ') + '\n'); } catch {} };
+process.on('uncaughtException', e => log('UNCAUGHT', e.stack || e.message));
 let win, llm = null, asr = null;
 const modelsDir = () => path.join(app.getPath('userData'), 'models');
 const send = (c, d) => win && win.webContents.send(c, d);
@@ -31,6 +35,11 @@ app.whenReady().then(() => {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadFile('renderer/index.html');
+  win.webContents.on('console-message', (e, lvl, msg, line, src) => log('CONSOLE', lvl, msg, src + ':' + line));
+  win.webContents.on('did-fail-load', (e, code, desc, url) => log('LOAD FAIL', code, desc, url));
+  win.webContents.on('render-process-gone', (e, d) => log('RENDER GONE', d.reason));
+  win.webContents.on('preload-error', (e, p, err) => log('PRELOAD ERR', p, err.message));
+  log('started; app dir =', __dirname);
   win.webContents.once('did-finish-load', loadLLM);
 });
 
